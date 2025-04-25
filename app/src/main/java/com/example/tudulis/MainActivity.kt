@@ -1,7 +1,9 @@
 package com.example.tudulis
 
 import android.app.DatePickerDialog
+import android.graphics.Paint
 import android.os.Bundle
+import android.text.Layout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -36,20 +38,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tudulis.ui.theme.TudulisTheme
 import java.util.Calendar
+
+data class Task(
+    val name: String,
+    val dueDate: String,
+    val tag: String,
+    val isDone: Boolean = false
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +70,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             var showForm by remember { mutableStateOf(false) }
+            val tasks = remember { mutableStateListOf<Task>() }
+            var editingTaskIndex by remember { mutableStateOf<Int?>(null) }
 
             TudulisTheme {
                 Scaffold(
@@ -69,11 +84,33 @@ class MainActivity : ComponentActivity() {
                     if (showForm) {
                         LamanTambahUbah(
                             modifier = Modifier.padding(innerPadding),
-                            onSave = { showForm = false }
+                            tasks = tasks,
+                            editingIndex = editingTaskIndex,
+                            onSave = { task ->
+                                if (editingTaskIndex != null) {
+                                    tasks[editingTaskIndex!!] = task
+                                    editingTaskIndex = null
+                                } else {
+                                    tasks.add(task)
+                                }
+                                showForm = false
+                            },
+                            onCancel = {
+                                showForm = false
+                                editingTaskIndex = null
+                            }
                         )
                     } else {
                         LamanUtama(
-                            modifier = Modifier.padding(innerPadding)
+                            modifier = Modifier.padding(innerPadding),
+                            tasks = tasks,
+                            onEdit = { task ->
+                                editingTaskIndex = tasks.indexOf(task)
+                                showForm = true
+                            },
+                            onDelete = { task ->
+                                tasks.remove(task)
+                            }
                         )
                     }
                 }
@@ -83,8 +120,15 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun LamanUtama(modifier: Modifier = Modifier) {
+fun LamanUtama(
+    modifier: Modifier = Modifier,
+    tasks: SnapshotStateList<Task>,
+    onEdit: (Task) -> Unit,
+    onDelete: (Task) -> Unit
+) {
     var cariUrusan by remember { mutableStateOf("") }
+    val belumSelesaiCount = tasks.count { !it.isDone }
+    val sudahSelesaiCount = tasks.count { it.isDone }
 
     Column(
         modifier = modifier
@@ -100,7 +144,7 @@ fun LamanUtama(modifier: Modifier = Modifier) {
                 .background(Color.Cyan)
                 .padding(10.dp)
         ) {
-            Column {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Statistik",
                     fontSize = 20.sp,
@@ -109,7 +153,7 @@ fun LamanUtama(modifier: Modifier = Modifier) {
 
                 Row(
                     modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -118,9 +162,9 @@ fun LamanUtama(modifier: Modifier = Modifier) {
                             .background(Color.LightGray, RoundedCornerShape(12.dp))
                             .padding(16.dp)
                     ) {
-                        Column {
-                            Text("Belum Selesai", fontWeight = FontWeight.Bold)
-                            Text("var")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("  Belum Selesai", fontWeight = FontWeight.Bold)
+                            Text("$belumSelesaiCount", fontSize = 32.sp)
                         }
                     }
 
@@ -131,9 +175,9 @@ fun LamanUtama(modifier: Modifier = Modifier) {
                             .background(Color.LightGray, RoundedCornerShape(12.dp))
                             .padding(16.dp)
                     ) {
-                        Column {
-                            Text("Sudah Selesai", fontWeight = FontWeight.Bold)
-                            Text("var")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("  Sudah Selesai", fontWeight = FontWeight.Bold)
+                            Text("$sudahSelesaiCount", fontSize = 32.sp)
                         }
                     }
                 }
@@ -174,7 +218,17 @@ fun LamanUtama(modifier: Modifier = Modifier) {
             fontSize = 12.sp,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-         DaftarUrusan(tasks = listOf("Belanja", "Buat janji temu", "ETS PPB"))
+        DaftarUrusan(
+            tasks = tasks.filter { !it.isDone },
+            onToggleDone = { task ->
+                val index = tasks.indexOf(task)
+                if (index != -1) {
+                    tasks[index] = task.copy(isDone = true)
+                }
+            },
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
 
         // Selesai
         Text(
@@ -183,118 +237,135 @@ fun LamanUtama(modifier: Modifier = Modifier) {
             fontSize = 12.sp,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-        DaftarUrusan(tasks = listOf("Bersih2", "Cuci baju"), finished = true)
+        DaftarUrusan(
+            tasks = tasks.filter { it.isDone },
+            onToggleDone = { task ->
+                val index = tasks.indexOf(task)
+                if (index != -1) {
+                    tasks[index] = task.copy(isDone = false)
+                }
+            },
+            onEdit = onEdit,
+            onDelete = onDelete
+        )
     }
 }
 
 @Composable
 fun LamanTambahUbah(
     modifier: Modifier = Modifier,
-    onSave: () -> Unit = {}
+    tasks: SnapshotStateList<Task>,
+    editingIndex: Int? = null,
+    onSave: (Task) -> Unit,
+    onCancel: () -> Unit
 ) {
-    var showLamanUtama by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+    val year = calendar.get(Calendar.YEAR)
+    val month = calendar.get(Calendar.MONTH)
+    val day = calendar.get(Calendar.DAY_OF_MONTH)
 
-    if (showLamanUtama) {
-        LamanUtama()
-    } else {
-        val context = LocalContext.current
-        val calendar = Calendar.getInstance()
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH)
-        val day = calendar.get(Calendar.DAY_OF_MONTH)
+    val existingTask = editingIndex?.let { tasks[it] }
 
-        var taskText by remember { mutableStateOf("") }
-        var dueDate by remember { mutableStateOf("") }
-        var selectedTag by remember { mutableStateOf("None") }
+    var taskText by remember { mutableStateOf(existingTask?.name ?: "") }
+    var dueDate by remember { mutableStateOf(existingTask?.dueDate ?: "") }
+    var selectedTag by remember { mutableStateOf(existingTask?.tag ?: "None") }
 
-        val datePickerDialog = remember {
-            DatePickerDialog(
-                context,
-                { _, selectedYear, selectedMonth, selectedDay ->
-                    dueDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
-                },
-                year,
-                month,
-                day
-            )
-        }
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, selectedYear, selectedMonth, selectedDay ->
+                dueDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+            },
+            year,
+            month,
+            day
+        )
+    }
 
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Urusan
+        TextField(
+            value = taskText,
+            onValueChange = { taskText = it },
+            label = { Text("Urusan apa kali ini?") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Pilih tanggal
+        OutlinedButton(
+            onClick = { datePickerDialog.show() },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Urusan
-            TextField(
-                value = taskText,
-                onValueChange = { taskText = it },
-                label = { Text("Urusan apa kali ini?") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Pilih tanggal
-            OutlinedButton(
-                onClick = { datePickerDialog.show() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = if (dueDate.isNotEmpty()) "Terakhir: $dueDate" else "Kapan terakhir?")
-            }
-
-            // Pilih tag
-            var expanded by remember { mutableStateOf(false) }
-            Box {
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Tag: $selectedTag")
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    listOf("Kerja", "Pribadi", "Mendesak").forEach { tag ->
-                        DropdownMenuItem(
-                            text = { Text(tag) },
-                            onClick = {
-                                selectedTag = tag
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Simpan
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = { showLamanUtama = true },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Kembali")
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Button(
-                    onClick = onSave,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Simpan")
-                }
-            }
-
+            Text(text = if (dueDate.isNotEmpty()) "Terakhir: $dueDate" else "Kapan terakhir?")
         }
+
+        // Pilih tag
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Tag: $selectedTag")
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                listOf("Kerja", "Pribadi", "Mendesak").forEach { tag ->
+                    DropdownMenuItem(
+                        text = { Text(tag) },
+                        onClick = {
+                            selectedTag = tag
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Kembali / Simpan
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Button(
+                onClick = onCancel,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Kembali")
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Button(
+                onClick = {
+                    val task = Task(taskText, dueDate, selectedTag, existingTask?.isDone ?: false)
+                    onSave(task)
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Simpan")
+            }
+        }
+
     }
 }
 
 @Composable
-fun DaftarUrusan(tasks: List<String>, finished: Boolean = false) {
-    var konfirmasiHapus by remember { mutableStateOf(false) }
+fun DaftarUrusan(
+    tasks: List<Task>,
+    onToggleDone: (Task) -> Unit,
+    onDelete: (Task) -> Unit,
+    onEdit: (Task) -> Unit
+) {
+    var taskToDelete by remember { mutableStateOf<Task?>(null) }
 
     Column {
         tasks.forEach { task ->
@@ -309,16 +380,29 @@ fun DaftarUrusan(tasks: List<String>, finished: Boolean = false) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = task)
+                    Row(modifier = Modifier.weight(1f)) {
+                        Row {
+                            TextButton(onClick = { onToggleDone(task) }) {
+                                Text(if (task.isDone) "X" else "O")
+                            }
+                        }
+                        Column {
+                            Text(text = task.name)
+                            Row {
+                                Text(text = task.tag + " | ")
+                                Text(text = task.dueDate)
+                            }
+                        }
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        IconButton(onClick = {  }) {
+                        IconButton(onClick = { onEdit(task) }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
                         }
 
-                        IconButton(onClick = { konfirmasiHapus = true  }) {
+                        IconButton(onClick = { taskToDelete = task }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
                     }
@@ -329,11 +413,12 @@ fun DaftarUrusan(tasks: List<String>, finished: Boolean = false) {
         }
     }
 
-    if (konfirmasiHapus) {
+    taskToDelete?.let {
         DialogKonfirmasiHapus(
-            onDismiss = { konfirmasiHapus = false },
+            onDismiss = { taskToDelete = null },
             onConfirmDelete = {
-                konfirmasiHapus = false
+                onDelete(it)
+                taskToDelete = null
             }
         )
     }
@@ -364,10 +449,10 @@ fun DialogKonfirmasiHapus(
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun TudulisPreview() {
-    TudulisTheme {
-        LamanUtama()
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun TudulisPreview() {
+//    TudulisTheme {
+//        LamanUtama()
+//    }
+//}
