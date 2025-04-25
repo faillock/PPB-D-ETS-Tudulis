@@ -1,4 +1,4 @@
-# PPB (D) ETC Tudulis
+# PPB (D) ETS Tudulis
 
 Kelompok 13:
 
