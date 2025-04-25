@@ -1,39 +1,67 @@
 package com.example.tudulis
 
+import android.app.DatePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.tudulis.ui.theme.TudulisTheme
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TudulisTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Tudulis(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+            var showForm by remember { mutableStateOf(false) }
 
+            TudulisTheme {
                 Scaffold(
                     floatingActionButton = {
-                        FloatingActionButton(onClick = { LamanTambahUbah() }) {
+                        FloatingActionButton(onClick = { showForm = true }) {
                             Text("+")
                         }
                     }
                 ) { innerPadding ->
-                    ToDoScreen(Modifier.padding(innerPadding))
+                    if (showForm) {
+                        LamanTambahUbah(
+                            modifier = Modifier.padding(innerPadding),
+                            onSave = { showForm = false } // Hide form after saving
+                        )
+                    } else {
+                        LamanUtama(
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
@@ -41,7 +69,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun LamanUtama(name: String, modifier: Modifier = Modifier) {
+fun LamanUtama(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -82,21 +110,21 @@ fun LamanUtama(name: String, modifier: Modifier = Modifier) {
 
         // Belum Selesai
         Text(
-            text = "Urusan Belum Selesai",
+            text = "Urusan Belum Selesai    v",
             fontWeight = FontWeight.SemiBold,
             fontSize = 12.sp,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-        TaskList(tasks = listOf("Belanja", "Buat janji temu", "ETS PPB"))
+        // TaskList(tasks = listOf("Belanja", "Buat janji temu", "ETS PPB"))
 
         // Selesai
         Text(
-            text = "Finished Tasks",
+            text = "Urusan Selesai      v",
             fontWeight = FontWeight.SemiBold,
             fontSize = 12.sp,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-        TaskList(tasks = listOf("Bersih2", "Cuci baju"), finished = true)
+        // TaskList(tasks = listOf("Bersih2", "Cuci baju"), finished = true)
     }
 }
 
@@ -135,7 +163,7 @@ fun LamanTambahUbah(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Urusan
-        OutlinedTextField(
+        TextField(
             value = taskText,
             onValueChange = { taskText = it },
             label = { Text("Task") },
@@ -181,7 +209,7 @@ fun LamanTambahUbah(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
-                onClick = { LamanUtama() },
+                onClick = { /* LamanUtama() */ },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Kembali")
