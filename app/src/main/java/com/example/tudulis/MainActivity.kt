@@ -1,6 +1,7 @@
 package com.example.tudulis
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.graphics.Paint
 import android.os.Bundle
 import android.text.Layout
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -129,6 +132,7 @@ fun LamanUtama(
     var cariUrusan by remember { mutableStateOf("") }
     val belumSelesaiCount = tasks.count { !it.isDone }
     val sudahSelesaiCount = tasks.count { it.isDone }
+    var selectedTag by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
@@ -197,57 +201,108 @@ fun LamanUtama(
         )
 
         // Tag
+        val tags = listOf("Routine", "Misc", "Urgent")
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            listOf("Kerja", "Pribadi", "Mendesak").forEach { tag ->
+            AssistChip(
+                onClick = { selectedTag = null },
+                label = { Text("All") },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = if (selectedTag == null)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    else
+                        MaterialTheme.colorScheme.surface
+                )
+            )
+            tags.forEach { tag ->
                 AssistChip(
-                    onClick = { /* TODO: Filter by tag */ },
-                    label = { Text(tag) }
+                    onClick = {
+                        selectedTag = if (selectedTag == tag) null else tag
+                    },
+                    label = { Text(tag) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = if (selectedTag == tag)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        else
+                            MaterialTheme.colorScheme.surface
+                    )
                 )
             }
         }
 
+        val filteredTasks = tasks.filter { task ->
+            val matchesText = cariUrusan.isBlank() ||
+                    task.name.contains(cariUrusan, ignoreCase = true) ||
+                    task.dueDate.contains(cariUrusan, ignoreCase = true)
+
+            val matchesTag = selectedTag == null || task.tag == selectedTag
+
+            matchesText && matchesTag
+        }
+
+        var isBelumSelesaiExpanded by remember { mutableStateOf(true) }
+        var isSelesaiExpanded by remember { mutableStateOf(true) }
+
         // Belum Selesai
-        Text(
-            text = "Urusan Belum Selesai    v",
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        DaftarUrusan(
-            tasks = tasks.filter { !it.isDone },
-            onToggleDone = { task ->
-                val index = tasks.indexOf(task)
-                if (index != -1) {
-                    tasks[index] = task.copy(isDone = true)
-                }
-            },
-            onEdit = onEdit,
-            onDelete = onDelete
-        )
+        TextButton(
+            onClick = { isBelumSelesaiExpanded = !isBelumSelesaiExpanded },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = (if (isBelumSelesaiExpanded) "▼ " else "▶ ") + "Urusan Belum Selesai",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (isBelumSelesaiExpanded) {
+            DaftarUrusan(
+                tasks = filteredTasks.filter { !it.isDone },
+                onToggleDone = { task ->
+                    val index = tasks.indexOf(task)
+                    if (index != -1) {
+                        tasks[index] = task.copy(isDone = true)
+                    }
+                },
+                onEdit = onEdit,
+                onDelete = onDelete
+            )
+        }
 
         // Selesai
-        Text(
-            text = "Urusan Selesai      v",
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        DaftarUrusan(
-            tasks = tasks.filter { it.isDone },
-            onToggleDone = { task ->
-                val index = tasks.indexOf(task)
-                if (index != -1) {
-                    tasks[index] = task.copy(isDone = false)
-                }
-            },
-            onEdit = onEdit,
-            onDelete = onDelete
-        )
+        TextButton(
+            onClick = { isSelesaiExpanded = !isSelesaiExpanded },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = (if (isSelesaiExpanded) "▼ " else "▶ ") + "Urusan Selesai",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (isSelesaiExpanded) {
+            DaftarUrusan(
+                tasks = filteredTasks.filter { it.isDone },
+                onToggleDone = { task ->
+                    val index = tasks.indexOf(task)
+                    if (index != -1) {
+                        tasks[index] = task.copy(isDone = false)
+                    }
+                },
+                onEdit = onEdit,
+                onDelete = onDelete
+            )
+        }
+
     }
 }
 
@@ -271,11 +326,29 @@ fun LamanTambahUbah(
     var dueDate by remember { mutableStateOf(existingTask?.dueDate ?: "") }
     var selectedTag by remember { mutableStateOf(existingTask?.tag ?: "None") }
 
+    val selectedDate = remember { mutableStateOf("") }
+
+    val timePickerDialog = remember {
+        TimePickerDialog(
+            context,
+            { _, selectedHour, selectedMinute ->
+                selectedDate.value += " %02d:%02d".format(selectedHour, selectedMinute)
+                dueDate = selectedDate.value
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true
+        )
+    }
+
     val datePickerDialog = remember {
         DatePickerDialog(
             context,
             { _, selectedYear, selectedMonth, selectedDay ->
-                dueDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+                // First, store the selected date
+                selectedDate.value = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+                // Then show the time picker
+                timePickerDialog.show()
             },
             year,
             month,
@@ -303,6 +376,7 @@ fun LamanTambahUbah(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = if (dueDate.isNotEmpty()) "Terakhir: $dueDate" else "Kapan terakhir?")
+
         }
 
         // Pilih tag
@@ -318,7 +392,7 @@ fun LamanTambahUbah(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
-                listOf("Kerja", "Pribadi", "Mendesak").forEach { tag ->
+                listOf("Routine", "Misc", "Urgent").forEach { tag ->
                     DropdownMenuItem(
                         text = { Text(tag) },
                         onClick = {
@@ -396,7 +470,7 @@ fun DaftarUrusan(
                     }
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.End
                     ) {
                         IconButton(onClick = { onEdit(task) }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
